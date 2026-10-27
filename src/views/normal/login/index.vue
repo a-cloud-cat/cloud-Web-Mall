@@ -4,6 +4,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { User, Lock } from '@element-plus/icons-vue'
 import { login } from '@/apis/user'
+import { setToken } from '@/utils/auth'
 
 const router = useRouter()
 const route = useRoute()
@@ -41,7 +42,7 @@ const handleLogin = () => {
     try {
       const res = await login({ ...form })
       if (res.data?.token) {
-        localStorage.setItem('cloud_mall_token', res.data.token)
+        setToken(res.data.token)
       }
       ElMessage.success('登录成功')
       router.push(getRedirectTarget())
