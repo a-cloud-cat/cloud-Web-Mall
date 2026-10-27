@@ -19,8 +19,22 @@ export const constantRoutes = [
         component: () => import('@/views/home/index.vue'),
         meta: { title: '首页', icon: 'House' },
       },
+      {
+        path: 'pms/product',
+        name: 'pmsProduct',
+        component: () => import('@/views/pms/product/index.vue'),
+        meta: { title: '商品列表', icon: 'Goods' },
+      },
     ],
   },
+  {
+    path: '/404',
+    name: '404',
+    component: () => import('@/views/normal/404/index.vue'),
+    meta: { title: '404' },
+  },
+  // 通配路由放最后，匹配不到的路径走 404
+  { path: '/:pathMatch(.*)*', redirect: '/404' },
 ]
 
 const router = createRouter({
