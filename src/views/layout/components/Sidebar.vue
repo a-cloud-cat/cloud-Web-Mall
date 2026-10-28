@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { House, User, UserFilled, Goods, GoodsFilled } from '@element-plus/icons-vue'
+import { House, User, UserFilled, Goods, GoodsFilled, Folder, Avatar, Menu, List } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -13,10 +13,17 @@ const menus = [
 const pmsMenus = [
   { path: '/pms/product', title: '商品列表', icon: Goods },
   { path: '/pms/brand', title: '品牌管理', icon: GoodsFilled },
+  { path: '/pms/category', title: '商品分类', icon: Folder },
 ]
 
 const umsMenus = [
   { path: '/ums/admin', title: '管理员', icon: UserFilled },
+  { path: '/ums/role', title: '角色', icon: Avatar },
+  { path: '/ums/menu', title: '菜单', icon: Menu },
+]
+
+const omsMenus = [
+  { path: '/oms/order', title: '订单列表', icon: List },
 ]
 
 const activeMenu = computed(() => route.path)
@@ -72,6 +79,21 @@ const goLogin = () => {
         </template>
         <el-menu-item
           v-for="menu in umsMenus"
+          :key="menu.path"
+          :index="menu.path"
+        >
+          <el-icon><component :is="menu.icon" /></el-icon>
+          <template #title>{{ menu.title }}</template>
+        </el-menu-item>
+      </el-sub-menu>
+
+      <el-sub-menu index="oms">
+        <template #title>
+          <el-icon><List /></el-icon>
+          <span>订单管理</span>
+        </template>
+        <el-menu-item
+          v-for="menu in omsMenus"
           :key="menu.path"
           :index="menu.path"
         >
