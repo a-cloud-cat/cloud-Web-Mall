@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { House, User, Goods } from '@element-plus/icons-vue'
+import { House, User, UserFilled, Goods, GoodsFilled } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -12,6 +12,11 @@ const menus = [
 
 const pmsMenus = [
   { path: '/pms/product', title: '商品列表', icon: Goods },
+  { path: '/pms/brand', title: '品牌管理', icon: GoodsFilled },
+]
+
+const umsMenus = [
+  { path: '/ums/admin', title: '管理员', icon: UserFilled },
 ]
 
 const activeMenu = computed(() => route.path)
@@ -52,6 +57,21 @@ const goLogin = () => {
         </template>
         <el-menu-item
           v-for="menu in pmsMenus"
+          :key="menu.path"
+          :index="menu.path"
+        >
+          <el-icon><component :is="menu.icon" /></el-icon>
+          <template #title>{{ menu.title }}</template>
+        </el-menu-item>
+      </el-sub-menu>
+
+      <el-sub-menu index="ums">
+        <template #title>
+          <el-icon><UserFilled /></el-icon>
+          <span>用户管理</span>
+        </template>
+        <el-menu-item
+          v-for="menu in umsMenus"
           :key="menu.path"
           :index="menu.path"
         >

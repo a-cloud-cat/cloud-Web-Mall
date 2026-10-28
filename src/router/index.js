@@ -25,6 +25,18 @@ export const constantRoutes = [
         component: () => import('@/views/pms/product/index.vue'),
         meta: { title: '商品列表', icon: 'Goods' },
       },
+      {
+        path: 'pms/brand',
+        name: 'pmsBrand',
+        component: () => import('@/views/pms/brand/index.vue'),
+        meta: { title: '品牌管理', icon: 'GoodsFilled' },
+      },
+      {
+        path: 'ums/admin',
+        name: 'umsAdmin',
+        component: () => import('@/views/ums/admin/index.vue'),
+        meta: { title: '管理员', icon: 'UserFilled' },
+      },
     ],
   },
   {
