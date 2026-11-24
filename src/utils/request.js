@@ -1,7 +1,7 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import router from '@/router'
-import { getToken, removeToken } from '@/utils/auth'
+import { getToken, clearAuth } from '@/utils/auth'
 
 // 走 vite 代理转发，规避浏览器跨域
 const request = axios.create({
@@ -11,9 +11,12 @@ const request = axios.create({
 
 request.interceptors.request.use(
   (config) => {
-    const token = getToken()
-    if (token) {
-      config.headers.Authorization = token
+    // /c/** 是 C 端匿名接口，不加 token
+    if (!config.url?.startsWith('/c/')) {
+      const token = getToken()
+      if (token) {
+        config.headers.Authorization = token
+      }
     }
     return config
   },
@@ -33,11 +36,13 @@ request.interceptors.response.use(
     return res
   },
   (error) => {
+    // /c/** 匿名接口 401 不跳登录
     if (
       error.response?.status === 401 &&
-      !error.config?.url?.includes('/auth/login')
+      !error.config?.url?.includes('/auth/login') &&
+      !error.config?.url?.startsWith('/c/')
     ) {
-      removeToken()
+      clearAuth()
       if (!isRedirecting) {
         isRedirecting = true
         ElMessage.warning('登录已过期，请重新登录')

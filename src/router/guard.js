@@ -1,8 +1,8 @@
 import router from './index'
 import { getToken } from '@/utils/auth'
 
-// 白名单：无需登录即可访问的路由
-const whiteList = ['/login', '/404']
+// 白名单：无需登录即可访问的路由（C 端购买页匿名可进）
+const whiteList = ['/login', '/404', '/shop/buy', '/shop/query']
 
 router.beforeEach((to, from, next) => {
   const hasToken = !!getToken()

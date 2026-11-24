@@ -1,7 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 import { Search } from '@element-plus/icons-vue'
-import { getOrderBySn } from '@/apis/order'
+import { cGetOrderBySn } from '@/apis/order'
 
 const orderSn = ref('')
 const loading = ref(false)
@@ -25,7 +25,7 @@ const handleQuery = async () => {
   error.value = ''
   result.value = null
   try {
-    const res = await getOrderBySn(orderSn.value.trim())
+    const res = await cGetOrderBySn(orderSn.value.trim())
     result.value = res.data
   } catch {
     error.value = '订单不存在或查询失败'

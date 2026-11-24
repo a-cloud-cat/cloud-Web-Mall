@@ -2,8 +2,8 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { ShoppingCart } from '@element-plus/icons-vue'
-import { getProductList } from '@/apis/product'
-import { createOrder } from '@/apis/order'
+import { cGetProductList } from '@/apis/product'
+import { cCreateOrder } from '@/apis/order'
 
 const loading = ref(false)
 const products = ref([])
@@ -24,7 +24,7 @@ const buyResult = ref(null)
 const loadProducts = async () => {
   loading.value = true
   try {
-    const res = await getProductList({ pageNum: 1, pageSize: 20 })
+    const res = await cGetProductList({ pageNum: 1, pageSize: 20 })
     products.value = res.data.list || []
   } finally {
     loading.value = false
@@ -56,7 +56,7 @@ const submitOrder = async () => {
   }
   buyLoading.value = true
   try {
-    const res = await createOrder({ ...f })
+    const res = await cCreateOrder({ ...f })
     buyResult.value = res.data
     ElMessage.success('下单成功！')
   } catch {

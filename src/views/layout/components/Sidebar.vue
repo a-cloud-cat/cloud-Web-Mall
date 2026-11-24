@@ -1,10 +1,24 @@
 <script setup>
-import { computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { House, User, UserFilled, Goods, GoodsFilled, Folder, Avatar, Menu, List } from '@element-plus/icons-vue'
+import { ElMessageBox, ElMessage } from 'element-plus'
+import {
+  House, User, UserFilled, Goods, GoodsFilled, Folder, Avatar, Menu, List,
+  ShoppingCart, Search, SwitchButton,
+} from '@element-plus/icons-vue'
+import { getToken, getUsername, clearAuth } from '@/utils/auth'
 
 const router = useRouter()
 const route = useRoute()
+
+const isLoggedIn = ref(false)
+const username = ref('')
+
+const refreshAuth = () => {
+  isLoggedIn.value = !!getToken()
+  username.value = getUsername() || ''
+}
+onMounted(refreshAuth)
 
 const menus = [
   { path: '/home', title: '首页', icon: House },
@@ -26,6 +40,12 @@ const omsMenus = [
   { path: '/oms/order', title: '订单列表', icon: List },
 ]
 
+// C 端体验页：匿名可访问，不登录也能点
+const shopMenus = [
+  { path: '/shop/buy', title: '模拟购买', icon: ShoppingCart },
+  { path: '/shop/query', title: '按单号查单', icon: Search },
+]
+
 const activeMenu = computed(() => route.path)
 
 const handleSelect = (index) => {
@@ -34,6 +54,16 @@ const handleSelect = (index) => {
 
 const goLogin = () => {
   router.push({ path: '/login', query: { redirect: route.fullPath } })
+}
+
+const handleLogout = () => {
+  ElMessageBox.confirm('确定退出登录吗？', '提示', { type: 'warning' })
+    .then(() => {
+      clearAuth()
+      ElMessage.success('已退出登录')
+      router.push('/login')
+    })
+    .catch(() => {})
 }
 </script>
 
@@ -48,11 +78,7 @@ const goLogin = () => {
       router
       @select="handleSelect"
     >
-      <el-menu-item
-        v-for="menu in menus"
-        :key="menu.path"
-        :index="menu.path"
-      >
+      <el-menu-item v-for="menu in menus" :key="menu.path" :index="menu.path">
         <el-icon><component :is="menu.icon" /></el-icon>
         <template #title>{{ menu.title }}</template>
       </el-menu-item>
@@ -62,11 +88,7 @@ const goLogin = () => {
           <el-icon><Goods /></el-icon>
           <span>商品管理</span>
         </template>
-        <el-menu-item
-          v-for="menu in pmsMenus"
-          :key="menu.path"
-          :index="menu.path"
-        >
+        <el-menu-item v-for="menu in pmsMenus" :key="menu.path" :index="menu.path">
           <el-icon><component :is="menu.icon" /></el-icon>
           <template #title>{{ menu.title }}</template>
         </el-menu-item>
@@ -77,11 +99,7 @@ const goLogin = () => {
           <el-icon><UserFilled /></el-icon>
           <span>用户管理</span>
         </template>
-        <el-menu-item
-          v-for="menu in umsMenus"
-          :key="menu.path"
-          :index="menu.path"
-        >
+        <el-menu-item v-for="menu in umsMenus" :key="menu.path" :index="menu.path">
           <el-icon><component :is="menu.icon" /></el-icon>
           <template #title>{{ menu.title }}</template>
         </el-menu-item>
@@ -92,17 +110,32 @@ const goLogin = () => {
           <el-icon><List /></el-icon>
           <span>订单管理</span>
         </template>
-        <el-menu-item
-          v-for="menu in omsMenus"
-          :key="menu.path"
-          :index="menu.path"
-        >
+        <el-menu-item v-for="menu in omsMenus" :key="menu.path" :index="menu.path">
+          <el-icon><component :is="menu.icon" /></el-icon>
+          <template #title>{{ menu.title }}</template>
+        </el-menu-item>
+      </el-sub-menu>
+
+      <el-sub-menu index="shop">
+        <template #title>
+          <el-icon><ShoppingCart /></el-icon>
+          <span>购买中心</span>
+        </template>
+        <el-menu-item v-for="menu in shopMenus" :key="menu.path" :index="menu.path">
           <el-icon><component :is="menu.icon" /></el-icon>
           <template #title>{{ menu.title }}</template>
         </el-menu-item>
       </el-sub-menu>
     </el-menu>
-    <div class="login-entry" @click="goLogin">
+
+    <!-- 已登录：显示用户名 + 退出 -->
+    <div v-if="isLoggedIn" class="login-entry logged" @click="handleLogout">
+      <el-icon><UserFilled /></el-icon>
+      <span class="username">{{ username || '已登录' }}</span>
+      <el-icon class="logout-icon"><SwitchButton /></el-icon>
+    </div>
+    <!-- 未登录：显示登录入口 -->
+    <div v-else class="login-entry" @click="goLogin">
       <el-icon><User /></el-icon>
       <span>登录</span>
     </div>
@@ -115,11 +148,10 @@ const goLogin = () => {
   display: flex;
   flex-direction: column;
 }
-
 .sidebar .el-menu {
   flex: 1;
+  border-right: none;
 }
-
 .login-entry {
   height: 50px;
   display: flex;
@@ -130,12 +162,20 @@ const goLogin = () => {
   cursor: pointer;
   border-top: 1px solid #1f2d3d;
 }
-
 .login-entry:hover {
   color: #409eff;
   background-color: #263445;
 }
-
+.login-entry.logged .username {
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.logout-icon {
+  font-size: 14px;
+  opacity: 0.7;
+}
 .logo {
   height: 50px;
   line-height: 50px;

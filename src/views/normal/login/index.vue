@@ -4,7 +4,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { User, Lock } from '@element-plus/icons-vue'
 import { login } from '@/apis/user'
-import { setToken } from '@/utils/auth'
+import { setToken, setUsername } from '@/utils/auth'
 
 const router = useRouter()
 const route = useRoute()
