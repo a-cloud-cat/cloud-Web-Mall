@@ -1,14 +1,111 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { ShoppingCart } from '@element-plus/icons-vue'
+import { ShoppingCart, User, SwitchButton } from '@element-plus/icons-vue'
 import { cGetProductList } from '@/apis/product'
 import { cCreateOrder } from '@/apis/order'
+import { memberLogin, memberRegister, memberLogout } from '@/apis/member'
+import {
+  getMemberToken,
+  getMemberInfo,
+  setMemberToken,
+  setMemberInfo,
+  clearMemberAuth,
+} from '@/utils/auth'
 
 const loading = ref(false)
 const products = ref([])
 
-// 购买弹窗
+// ===== 会员登录态 =====
+const memberInfo = ref(getMemberInfo())
+const loggedIn = ref(!!getMemberToken())
+
+const authVisible = ref(false)
+const authTab = ref('login')
+const loginForm = ref({ username: '', password: '' })
+const registerForm = ref({ username: '', password: '', nickname: '' })
+const authLoading = ref(false)
+// 未登录时点了提交订单 → 暂存，登录成功后自动提交
+const pendingOrder = ref(null)
+
+const refreshMember = () => {
+  memberInfo.value = getMemberInfo()
+  loggedIn.value = !!getMemberToken()
+}
+
+const openAuth = (tab) => {
+  authTab.value = tab
+  authVisible.value = true
+}
+
+const handleLogin = async () => {
+  if (!loginForm.value.username || !loginForm.value.password) {
+    ElMessage.warning('请输入用户名和密码')
+    return
+  }
+  authLoading.value = true
+  try {
+    const res = await memberLogin(loginForm.value)
+    setMemberToken(res.data.token)
+    setMemberInfo(res.data)
+    refreshMember()
+    ElMessage.success(`欢迎，${res.data.nickname || res.data.username}`)
+    authVisible.value = false
+    // 登录成功后若有待提交订单，自动下单
+    if (pendingOrder.value) {
+      const p = pendingOrder.value
+      pendingOrder.value = null
+      doSubmit(p)
+    }
+  } catch {
+    // 错误已由拦截器提示
+  } finally {
+    authLoading.value = false
+  }
+}
+
+const handleRegister = async () => {
+  const f = registerForm.value
+  if (!f.username || !f.password) {
+    ElMessage.warning('请填写用户名和密码')
+    return
+  }
+  authLoading.value = true
+  try {
+    await memberRegister(f)
+    ElMessage.success('注册成功，请登录')
+    loginForm.value = { username: f.username, password: f.password }
+    authTab.value = 'login'
+  } catch {
+    // 错误已由拦截器提示
+  } finally {
+    authLoading.value = false
+  }
+}
+
+const handleLogout = async () => {
+  try {
+    await memberLogout()
+  } catch {
+    // 忽略
+  }
+  clearMemberAuth()
+  refreshMember()
+  ElMessage.success('已退出会员')
+}
+
+// ===== 商品 =====
+const loadProducts = async () => {
+  loading.value = true
+  try {
+    const res = await cGetProductList({ pageNum: 1, pageSize: 20 })
+    products.value = res.data.list || []
+  } finally {
+    loading.value = false
+  }
+}
+
+// ===== 下单 =====
 const buyVisible = ref(false)
 const buyLoading = ref(false)
 const currentProduct = ref(null)
@@ -20,16 +117,6 @@ const form = ref({
   receiverAddress: '',
 })
 const buyResult = ref(null)
-
-const loadProducts = async () => {
-  loading.value = true
-  try {
-    const res = await cGetProductList({ pageNum: 1, pageSize: 20 })
-    products.value = res.data.list || []
-  } finally {
-    loading.value = false
-  }
-}
 
 const handleBuy = (product) => {
   currentProduct.value = product
@@ -44,7 +131,7 @@ const handleBuy = (product) => {
   buyVisible.value = true
 }
 
-const submitOrder = async () => {
+const submitOrder = () => {
   const f = form.value
   if (!f.receiverName || !f.receiverPhone || !f.receiverAddress) {
     ElMessage.warning('请完整填写收货人信息')
@@ -54,13 +141,25 @@ const submitOrder = async () => {
     ElMessage.warning('购买数量至少为 1')
     return
   }
+  if (!loggedIn.value) {
+    pendingOrder.value = { ...f }
+    ElMessage.info('请先登录会员再下单')
+    buyVisible.value = false
+    openAuth('login')
+    return
+  }
+  doSubmit(f)
+}
+
+const doSubmit = async (payload) => {
+  buyVisible.value = true
   buyLoading.value = true
   try {
-    const res = await cCreateOrder({ ...f })
+    const res = await cCreateOrder(payload)
     buyResult.value = res.data
     ElMessage.success('下单成功！')
   } catch {
-    // 失败提示已由 request 拦截器处理
+    // 失败已由拦截器提示
   } finally {
     buyLoading.value = false
   }
@@ -71,13 +170,32 @@ const closeBuy = () => {
   buyResult.value = null
 }
 
-onMounted(loadProducts)
+onMounted(() => {
+  loadProducts()
+  refreshMember()
+})
 </script>
 
 <template>
   <div class="shop-page">
-    <h2 class="page-title">🛒 模拟购买</h2>
-    <p class="page-desc">模拟 C 端用户浏览商品并下单的完整流程</p>
+    <div class="page-header">
+      <div>
+        <h2 class="page-title">🛒 模拟购买</h2>
+        <p class="page-desc">C 端用户浏览商品 → 会员登录 → 下单的完整流程</p>
+      </div>
+      <div class="member-bar">
+        <template v-if="loggedIn">
+          <el-icon><User /></el-icon>
+          <span class="member-name">{{ memberInfo?.nickname || memberInfo?.username }}</span>
+          <el-button text type="danger" :icon="SwitchButton" @click="handleLogout">退出</el-button>
+        </template>
+        <template v-else>
+          <el-button type="primary" link @click="openAuth('login')">登录</el-button>
+          <span class="bar-sep">/</span>
+          <el-button type="primary" link @click="openAuth('register')">注册</el-button>
+        </template>
+      </div>
+    </div>
 
     <div v-loading="loading" class="product-grid">
       <div v-for="p in products" :key="p.id" class="product-card">
@@ -97,7 +215,7 @@ onMounted(loadProducts)
 
     <!-- 下单弹窗 -->
     <el-dialog v-model="buyVisible" :title="buyResult ? '下单成功' : '确认订单'" width="480px" @close="closeBuy">
-      <!-- 表单状态 -->
+      <!-- 表单 -->
       <template v-if="!buyResult">
         <div class="buy-product">
           <span class="buy-product-label">商品</span>
@@ -120,16 +238,16 @@ onMounted(loadProducts)
           </el-form-item>
         </el-form>
 
-        <template #footer>
-          <el-button @click="buyVisible = false">取消</el-button>
-          <el-button type="primary" :loading="buyLoading" @click="submitOrder">提交订单</el-button>
-        </template>
+        <div v-if="!loggedIn" class="login-tip">
+          ⚠️ 下单前需要先登录会员，点击「提交订单」将自动弹出登录框
+        </div>
       </template>
 
-      <!-- 成功状态 -->
+      <!-- 成功 -->
       <template v-else>
         <div class="success-box">
           <div class="success-title">🎉 下单成功！</div>
+          <div class="success-item"><span>下单会员：</span><b>{{ buyResult.memberUsername }}</b></div>
           <div class="success-item"><span>订单号：</span><code>{{ buyResult.orderSn }}</code></div>
           <div class="success-item"><span>订单状态：</span><el-tag type="warning">待发货</el-tag></div>
           <div class="success-item"><span>订单金额：</span><b>￥{{ buyResult.totalAmount }}</b></div>
@@ -138,9 +256,48 @@ onMounted(loadProducts)
             或到「按单号查单」页面输入订单号查看详情
           </div>
         </div>
-        <template #footer>
-          <el-button @click="closeBuy">关闭</el-button>
+      </template>
+
+      <template #footer>
+        <el-button v-if="buyResult" @click="closeBuy">关闭</el-button>
+        <template v-else>
+          <el-button @click="buyVisible = false">取消</el-button>
+          <el-button type="primary" :loading="buyLoading" @click="submitOrder">提交订单</el-button>
         </template>
+      </template>
+    </el-dialog>
+
+    <!-- 会员登录 / 注册弹窗 -->
+    <el-dialog v-model="authVisible" :title="authTab === 'login' ? '会员登录' : '会员注册'" width="400px">
+      <el-tabs v-model="authTab">
+        <el-tab-pane label="登录" name="login">
+          <el-form label-width="80px">
+            <el-form-item label="用户名">
+              <el-input v-model="loginForm.username" placeholder="请输入用户名" />
+            </el-form-item>
+            <el-form-item label="密码">
+              <el-input v-model="loginForm.password" type="password" show-password placeholder="请输入密码" @keyup.enter="handleLogin" />
+            </el-form-item>
+          </el-form>
+        </el-tab-pane>
+        <el-tab-pane label="注册" name="register">
+          <el-form label-width="80px">
+            <el-form-item label="用户名">
+              <el-input v-model="registerForm.username" placeholder="3-20 位" />
+            </el-form-item>
+            <el-form-item label="昵称">
+              <el-input v-model="registerForm.nickname" placeholder="选填" />
+            </el-form-item>
+            <el-form-item label="密码">
+              <el-input v-model="registerForm.password" type="password" show-password placeholder="至少 3 位" />
+            </el-form-item>
+          </el-form>
+        </el-tab-pane>
+      </el-tabs>
+      <template #footer>
+        <el-button @click="authVisible = false">取消</el-button>
+        <el-button v-if="authTab === 'login'" type="primary" :loading="authLoading" @click="handleLogin">登录</el-button>
+        <el-button v-else type="primary" :loading="authLoading" @click="handleRegister">注册</el-button>
       </template>
     </el-dialog>
   </div>
@@ -150,15 +307,35 @@ onMounted(loadProducts)
 .shop-page {
   padding: 20px;
 }
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 20px;
+}
 .page-title {
   margin: 0 0 4px;
   font-size: 22px;
   color: #303133;
 }
 .page-desc {
-  margin: 0 0 20px;
+  margin: 0;
   color: #909399;
   font-size: 14px;
+}
+.member-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: #606266;
+}
+.member-name {
+  color: #409eff;
+  font-weight: 500;
+}
+.bar-sep {
+  color: #dcdfe6;
 }
 .product-grid {
   display: grid;
@@ -232,6 +409,14 @@ onMounted(loadProducts)
   color: #f56c6c;
   font-weight: bold;
 }
+.login-tip {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: #fdf6ec;
+  border-radius: 6px;
+  color: #e6a23c;
+  font-size: 13px;
+}
 .success-box {
   text-align: center;
   padding: 20px 0;
@@ -253,7 +438,7 @@ onMounted(loadProducts)
 }
 .success-item b {
   color: #f56c6c;
-  font-size: 18px;
+  font-size: 16px;
 }
 .success-hint {
   margin-top: 20px;

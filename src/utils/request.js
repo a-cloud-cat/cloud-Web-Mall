@@ -1,7 +1,7 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import router from '@/router'
-import { getToken, clearAuth } from '@/utils/auth'
+import { getToken, clearAuth, getMemberToken, clearMemberAuth } from '@/utils/auth'
 
 // 走 vite 代理转发，规避浏览器跨域
 const request = axios.create({
@@ -11,8 +11,14 @@ const request = axios.create({
 
 request.interceptors.request.use(
   (config) => {
-    // /c/** 是 C 端匿名接口，不加 token
-    if (!config.url?.startsWith('/c/')) {
+    if (config.url?.startsWith('/c/')) {
+      // C 端：带会员 token（与管理员 token 分开）
+      const memberToken = getMemberToken()
+      if (memberToken) {
+        config.headers.Authorization = memberToken
+      }
+    } else {
+      // B 端：带管理员 token
       const token = getToken()
       if (token) {
         config.headers.Authorization = token
@@ -36,19 +42,20 @@ request.interceptors.response.use(
     return res
   },
   (error) => {
-    // /c/** 匿名接口 401 不跳登录
-    if (
-      error.response?.status === 401 &&
-      !error.config?.url?.includes('/auth/login') &&
-      !error.config?.url?.startsWith('/c/')
-    ) {
-      clearAuth()
-      if (!isRedirecting) {
-        isRedirecting = true
-        ElMessage.warning('登录已过期，请重新登录')
-        router.replace({ path: '/login', query: { redirect: router.currentRoute.value.fullPath } }).finally(() => {
-          isRedirecting = false
-        })
+    const url = error.config?.url || ''
+    if (error.response?.status === 401) {
+      if (url.startsWith('/c/')) {
+        // C 端 401：清会员登录态，不跳管理员登录页
+        clearMemberAuth()
+      } else if (!url.includes('/auth/login')) {
+        clearAuth()
+        if (!isRedirecting) {
+          isRedirecting = true
+          ElMessage.warning('登录已过期，请重新登录')
+          router.replace({ path: '/login', query: { redirect: router.currentRoute.value.fullPath } }).finally(() => {
+            isRedirecting = false
+          })
+        }
       }
       return Promise.reject(error)
     }
