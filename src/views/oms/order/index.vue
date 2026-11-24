@@ -1,8 +1,8 @@
 <script setup>
-import { ref, onMounted } from 'vue'
-import { Search, View, Delete } from '@element-plus/icons-vue'
+import { ref, reactive, onMounted } from 'vue'
+import { Search, View, Delete, Van } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getOrderList, getOrder, deleteOrder } from '@/apis/order'
+import { getOrderList, getOrder, deleteOrder, deliveryOrder } from '@/apis/order'
 
 const query = ref({
   pageNum: 1,
@@ -17,12 +17,16 @@ const loading = ref(false)
 const detailVisible = ref(false)
 const detail = ref({ order: {}, itemList: [] })
 
+const deliveryVisible = ref(false)
+const deliveryForm = reactive({ deliveryCompany: '', deliverySn: '' })
+const deliveryTargetId = ref(null)
+const deliveryLoading = ref(false)
+
 const statusMap = {
-  0: { text: '待付款', type: 'warning' },
-  1: { text: '待发货', type: 'primary' },
-  2: { text: '已发货', type: 'success' },
-  3: { text: '已完成', type: 'success' },
-  4: { text: '已关闭', type: 'info' },
+  0: { text: '待发货', type: 'warning' },
+  1: { text: '已发货', type: 'primary' },
+  2: { text: '已完成', type: 'success' },
+  3: { text: '已关闭', type: 'info' },
 }
 
 const getList = async () => {
@@ -61,6 +65,29 @@ const handleView = async (row) => {
   const res = await getOrder(row.id)
   detail.value = res.data
   detailVisible.value = true
+}
+
+const handleDelivery = (row) => {
+  deliveryTargetId.value = row.id
+  deliveryForm.deliveryCompany = ''
+  deliveryForm.deliverySn = ''
+  deliveryVisible.value = true
+}
+
+const confirmDelivery = async () => {
+  if (!deliveryForm.deliveryCompany || !deliveryForm.deliverySn) {
+    ElMessage.warning('请填写物流公司和物流单号')
+    return
+  }
+  deliveryLoading.value = true
+  try {
+    await deliveryOrder(deliveryTargetId.value, { ...deliveryForm })
+    ElMessage.success('发货成功')
+    deliveryVisible.value = false
+    getList()
+  } finally {
+    deliveryLoading.value = false
+  }
 }
 
 const handleDelete = (row) => {
@@ -105,11 +132,6 @@ onMounted(getList)
         <el-table-column label="实付金额" width="120">
           <template #default="{ row }">￥{{ row.payAmount }}</template>
         </el-table-column>
-        <el-table-column label="支付方式" width="100">
-          <template #default="{ row }">
-            {{ ['未支付', '支付宝', '微信'][row.payType] || '-' }}
-          </template>
-        </el-table-column>
         <el-table-column label="状态" width="100">
           <template #default="{ row }">
             <el-tag :type="statusMap[row.status]?.type || 'info'">
@@ -123,9 +145,16 @@ onMounted(getList)
             {{ row.createTime ? row.createTime.slice(0, 19) : '-' }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="140" fixed="right">
+        <el-table-column label="操作" width="220" fixed="right">
           <template #default="{ row }">
             <el-button type="primary" link :icon="View" @click="handleView(row)">详情</el-button>
+            <el-button
+              v-if="row.status === 0"
+              type="success"
+              link
+              :icon="Van"
+              @click="handleDelivery(row)"
+            >发货</el-button>
             <el-button type="danger" link :icon="Delete" @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>
@@ -145,23 +174,21 @@ onMounted(getList)
       </div>
     </el-card>
 
+    <!-- 订单详情 -->
     <el-dialog v-model="detailVisible" title="订单详情" width="700px">
       <el-descriptions :column="2" border v-if="detail.order">
         <el-descriptions-item label="订单号">{{ detail.order.orderSn }}</el-descriptions-item>
         <el-descriptions-item label="用户账号">{{ detail.order.memberUsername }}</el-descriptions-item>
         <el-descriptions-item label="总金额">￥{{ detail.order.totalAmount }}</el-descriptions-item>
         <el-descriptions-item label="实付金额">￥{{ detail.order.payAmount }}</el-descriptions-item>
-        <el-descriptions-item label="支付方式">
-          {{ ['未支付', '支付宝', '微信'][detail.order.payType] || '-' }}
-        </el-descriptions-item>
         <el-descriptions-item label="状态">
           {{ statusMap[detail.order.status]?.text || '未知' }}
         </el-descriptions-item>
         <el-descriptions-item label="收货人">{{ detail.order.receiverName }}</el-descriptions-item>
         <el-descriptions-item label="电话">{{ detail.order.receiverPhone }}</el-descriptions-item>
         <el-descriptions-item label="收货地址" :span="2">{{ detail.order.receiverAddress }}</el-descriptions-item>
-        <el-descriptions-item label="物流公司">{{ detail.order.deliveryCompany }}</el-descriptions-item>
-        <el-descriptions-item label="物流单号">{{ detail.order.deliverySn }}</el-descriptions-item>
+        <el-descriptions-item label="物流公司">{{ detail.order.deliveryCompany || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="物流单号">{{ detail.order.deliverySn || '-' }}</el-descriptions-item>
         <el-descriptions-item label="下单时间" :span="2">{{ detail.order.createTime }}</el-descriptions-item>
       </el-descriptions>
 
@@ -172,6 +199,22 @@ onMounted(getList)
         <el-table-column prop="productQuantity" label="数量" width="80" />
         <el-table-column prop="productSn" label="货号" width="120" />
       </el-table>
+    </el-dialog>
+
+    <!-- 发货弹窗 -->
+    <el-dialog v-model="deliveryVisible" title="订单发货" width="480px">
+      <el-form label-width="100px">
+        <el-form-item label="物流公司">
+          <el-input v-model="deliveryForm.deliveryCompany" placeholder="如：顺丰速运" />
+        </el-form-item>
+        <el-form-item label="物流单号">
+          <el-input v-model="deliveryForm.deliverySn" placeholder="请输入运单号" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="deliveryVisible = false">取消</el-button>
+        <el-button type="primary" :loading="deliveryLoading" @click="confirmDelivery">确认发货</el-button>
+      </template>
     </el-dialog>
   </div>
 </template>

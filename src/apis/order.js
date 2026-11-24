@@ -15,6 +15,29 @@ export function getOrder(id) {
   })
 }
 
+export function getOrderBySn(orderSn) {
+  return request({
+    url: `/admin/order/sn/${orderSn}`,
+    method: 'get',
+  })
+}
+
+export function createOrder(data) {
+  return request({
+    url: '/admin/order/create',
+    method: 'post',
+    data,
+  })
+}
+
+export function deliveryOrder(id, data) {
+  return request({
+    url: `/admin/order/delivery/${id}`,
+    method: 'post',
+    data,
+  })
+}
+
 export function updateOrder(id, data) {
   return request({
     url: `/admin/order/update/${id}`,
