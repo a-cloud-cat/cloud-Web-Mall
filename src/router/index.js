@@ -61,6 +61,18 @@ export const constantRoutes = [
         component: () => import('@/views/oms/order/index.vue'),
         meta: { title: '订单列表', icon: 'List' },
       },
+      {
+        path: 'shop/buy',
+        name: 'shopBuy',
+        component: () => import('@/views/shop/buy/index.vue'),
+        meta: { title: '模拟购买', icon: 'ShoppingCart' },
+      },
+      {
+        path: 'shop/query',
+        name: 'shopQuery',
+        component: () => import('@/views/shop/query/index.vue'),
+        meta: { title: '按单号查单', icon: 'Search' },
+      },
     ],
   },
   {
